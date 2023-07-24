@@ -9,7 +9,6 @@ variable "cluster_name" {
   description = "The name of the cluster"
 }
 
-
 variable "service_account_name" {
   type        = string
   default     = "cluster-autoscaler"

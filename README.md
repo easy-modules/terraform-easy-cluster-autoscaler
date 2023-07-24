@@ -1,3 +1,15 @@
+Terraform module for deploying [cluster-autoscaler](https://kubernetes.github.io/autoscaler).
+
+```hcl
+  module "external_secrets" {
+  source         = "easy-modules/cluster-autoscaler/easy"
+  enabled        = true
+  cluster_name   = "eks-prod-42"
+  chart_name     = "cluster-autoscaler"
+  namespace      = "cluster-autoscaler-system"
+  settings       = {}
+}
+```
 <!-- BEGINNING OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
 ## Requirements
 
