@@ -1,5 +1,18 @@
+data "aws_caller_identity" "current" {}
+data "aws_partition" "current" {}
+data "aws_region" "current" {}
+data "aws_eks_cluster" "eks" {
+  name = var.cluster_name
+}
+
+locals {
+  account_id      = data.aws_caller_identity.current.account_id
+  partition       = data.aws_partition.current.partition
+  aws_region      = data.aws_region.current.name
+  eks_oidc_issuer = trimprefix(data.aws_eks_cluster.eks.identity[0].oidc[0].issuer, "https://")
+}
 #==============================================================================
-# EXTERNAL SECRET IAM ROLES
+# CLUSTER AUTOSCALER IAM ROLES/POLICIES
 #==============================================================================
 data "aws_iam_policy_document" "kubernetes_cluster_autoscaler" {
   count = var.enabled ? 1 : 0
@@ -42,12 +55,12 @@ data "aws_iam_policy_document" "kubernetes_cluster_autoscaler_assume" {
 
     principals {
       type        = "Federated"
-      identifiers = [var.cluster_identity_oidc_issuer_arn]
+      identifiers = ["arn:${local.partition}:iam::${local.account_id}:oidc-provider/${local.eks_oidc_issuer}"]
     }
 
     condition {
       test     = "StringEquals"
-      variable = "${replace(var.cluster_identity_oidc_issuer, "https://", "")}:sub"
+      variable = "${local.eks_oidc_issuer}:sub"
 
       values = [
         "system:serviceaccount:${var.namespace}:${var.service_account_name}",
@@ -55,18 +68,6 @@ data "aws_iam_policy_document" "kubernetes_cluster_autoscaler_assume" {
     }
 
     effect = "Allow"
-  }
-}
-
-#==============================================================================
-# HELM CHART
-#==============================================================================
-resource "kubernetes_namespace" "cluster_autoscaler" {
-  depends_on = [var.mod_dependency]
-  count      = (var.enabled && var.create_namespace && var.namespace != "kube-system") ? 1 : 0
-
-  metadata {
-    name = var.namespace
   }
 }
 
@@ -82,6 +83,20 @@ resource "aws_iam_role_policy_attachment" "kubernetes_cluster_autoscaler" {
   policy_arn = aws_iam_policy.kubernetes_cluster_autoscaler[0].arn
 }
 
+#==============================================================================
+# KUBERNETES
+#==============================================================================
+resource "kubernetes_namespace" "cluster_autoscaler" {
+  depends_on = [var.mod_dependency]
+  count      = (var.enabled && var.create_namespace && var.namespace != "kube-system") ? 1 : 0
+
+  metadata {
+    name = var.namespace
+  }
+}
+#==============================================================================
+# HELM CHART
+#==============================================================================
 resource "helm_release" "cluster_autoscaler" {
   depends_on = [var.mod_dependency, kubernetes_namespace.cluster_autoscaler]
   count      = var.enabled ? 1 : 0
@@ -103,7 +118,7 @@ resource "helm_release" "cluster_autoscaler" {
 
   set {
     name  = "awsRegion"
-    value = var.aws_region
+    value = local.aws_region
   }
 
   set {
