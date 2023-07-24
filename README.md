@@ -1,7 +1,7 @@
 Terraform module for deploying [cluster-autoscaler](https://kubernetes.github.io/autoscaler).
 
 ```hcl
-  module "external_secrets" {
+  module "cluster-autoscaler" {
   source         = "easy-modules/cluster-autoscaler/easy"
   enabled        = true
   cluster_name   = "eks-prod-42"
